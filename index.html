@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Story Platform - Gemini AI with Veo 3.1</title>
+    <style>
+        /* 🎨 Modern cinematic design */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .story-container {
+            width: 100%;
+            max-width: 1000px;
+            background: rgba(255, 255, 255, 0.98);
+            border-radius: 24px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(0,0,0,0.3);
+        }
+
+        .scene-display {
+            position: relative;
+            width: 100%;
+            height: 500px;
+            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+            overflow: hidden;
+        }
+
+        .scene-video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @keyframes slowZoom {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+        }
+
+        .loading-content {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
+        }
+
+        .loading-content h2 {
+            font-size: 28px;
+            margin-bottom: 20px;
+        }
+
+        .loading-progress {
+            width: 100%;
+            height: 4px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .loading-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            width: 0%;
+            transition: width 0.3s ease;
+            animation: shimmer 2s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .typing-indicator {
+            display: flex;
+            gap: 4px;
+            margin-top: 20px;
+            justify-content: center;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: white;
+            border-radius: 50%;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typing {
+            0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+            30% { opacity: 1; transform: translateY(-10px); }
+        }
+
+        .text-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.95));
+            color: white;
+            padding: 40px 30px 30px;
+        }
+
+        .scene-text {
+            font-size: 18px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+            max-width: 800px;
+            animation: fadeInUp 1s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .choices-container {
+            padding: 30px;
+            background: linear-gradient(to bottom, #f8f9fa, #ffffff);
+            min-height: 150px;
+        }
+
+        .choice-button {
+            display: block;
+            width: 100%;
+            padding: 18px 30px;
+            margin: 12px 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .choice-button::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+
+        .choice-button:hover::before {
+            width: 300px;
+            height: 300px;
+        }
+
+        .choice-button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .controls {
+            padding: 20px 30px;
+            background: white;
+            border-top: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .control-button {
+            padding: 10px 20px;
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .control-button:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .control-button.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .status {
+            color: #666;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        .ai-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px);
+            padding: 8px 16px;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            z-index: 5;
+        }
+
+        .ai-badge::before {
+            content: '🤖';
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .scene-display {
+                height: 300px;
+            }
+
+            .scene-text {
+                font-size: 16px;
+            }
+
+            .choice-button {
+                padding: 15px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="story-container">
+        <!-- 🎬 Scene Display -->
+        <div class="scene-display">
+            <video class="scene-video" id="sceneVideo" autoplay loop muted>
+                <source src="" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+
+            <!-- AI Badge -->
+            <div class="ai-badge">
+                Gemini AI + Veo 3.1
+            </div>
+
+            <!-- Loading Overlay -->
+            <div class="loading-overlay hidden" id="loadingOverlay">
+                <div class="loading-content">
+                    <h2>Creating Your Cinematic Scene</h2>
+                    <p id="loadingStatus">Initializing Gemini AI...</p>
+                    <div class="loading-progress">
+                        <div class="loading-progress-bar" id="progressBar"></div>
+                    </div>
+                    <div class="typing-indicator">
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                        <div class="typing-dot"></div>
+                    </div>
+                    <p style="margin-top: 20px; opacity: 0.7; font-size: 14px;">
+                        Veo 3.1 is generating your 8-second video with synchronized audio...
+                    </p>
+                </div>
+            </div>
+
+            <!-- Scene Text Overlay -->
+            <div class="text-overlay">
+                <p class="scene-text" id="sceneText">
+                    Welcome to the Interactive Story Platform powered by Gemini AI.
+                    Every scene is a cinematic video with synchronized audio, created in real-time.
+                    Your choices shape the narrative. Are you ready to begin?
+                </p>
+            </div>
+        </div>
+
+        <!-- 🎮 Choices -->
+        <div class="choices-container" id="choicesContainer">
+            <button class="choice-button" onclick="startStory()">
+                Begin Your Cinematic Adventure 🎬
+            </button>
+        </div>
+
+        <!-- 🎛️ Controls -->
+        <div class="controls">
+            <div>
+                <button class="control-button active" id="audioBtn" onclick="toggleAudio()">
+                    🔊 Audio ON
+                </button>
+                <button class="control-button" onclick="restartStory()">
+                    🔄 Restart
+                </button>
+            </div>
+            <span class="status" id="status">Ready to experience AI-generated video stories...</span>
+        </div>
+    </div>
+
+    <script>
+        // 🎮 INTERACTIVE STORY PLATFORM - Gemini AI Frontend Controller
+
+        // State management
+        let currentStory = 'detective';
+        let currentScene = null;
+        let audioEnabled = true;
+        let storyHistory = [];
+
+        // 🚀 Initialize story
+        async function startStory() {
+            console.log('🎬 Starting story...');
+            storyHistory = [];
+            await loadScene('opening');
+        }
+
+        // 📖 Load a scene
+        async function loadScene(sceneId) {
+            try {
+                showLoading(true, 'Loading scene data...', 10);
+
+                // Fetch scene data
+                const response = await fetch(`/api/story/${currentStory}/${sceneId}`);
+                if (!response.ok) throw new Error('Failed to load scene');
+
+                const scene = await response.json();
+                currentScene = scene;
+                storyHistory.push(scene);
+
+                // Update progress
+                showLoading(true, 'Generating video with Veo 3.1...', 30);
+
+                // Generate video with Gemini Veo 3.1 (includes audio!)
+                const videoResponse = await fetch('/api/generate-video', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: scene.videoPrompt,
+                        narration: scene.narrationText,
+                        duration: 8
+                    })
+                });
+
+                showLoading(true, 'Processing video and audio...', 70);
+                const videoData = await videoResponse.json();
+
+                // Update video source
+                const video = document.getElementById('sceneVideo');
+                video.src = videoData.videoUrl;
+                video.muted = !audioEnabled; // Video includes native audio from Veo
+
+                // Update text
+                document.getElementById('sceneText').textContent = scene.narrationText;
+
+                // Wait for video to load
+                video.onloadeddata = () => {
+                    showLoading(true, 'Ready!', 100);
+                    setTimeout(() => {
+                        showLoading(false);
+                        video.play();
+                    }, 500);
+                };
+
+                // Display choices
+                displayChoices(scene.choices);
+
+                // Update status
+                if (videoData.isPlaceholder) {
+                    updateStatus(`Scene: ${sceneId} (using placeholder - add Gemini API key)`);
+                } else {
+                    updateStatus(`Scene: ${sceneId} - Video generated with native audio`);
+                }
+
+            } catch (error) {
+                console.error('❌ Error loading scene:', error);
+                updateStatus('Error loading scene. Please check console and try again.');
+                showLoading(false);
+
+                // Show retry button
+                const container = document.getElementById('choicesContainer');
+                container.innerHTML = `
+                    <button class="choice-button" onclick="loadScene('${sceneId}')">
+                        🔄 Retry Scene
+                    </button>
+                    <button class="choice-button" onclick="startStory()">
+                        🏠 Restart Story
+                    </button>
+                `;
+            }
+        }
+
+        // 🎯 Display choice buttons
+        function displayChoices(choices) {
+            const container = document.getElementById('choicesContainer');
+            container.innerHTML = '';
+
+            if (!choices || choices.length === 0) {
+                container.innerHTML = `
+                    <button class="choice-button" onclick="startStory()">
+                        📖 Start New Story
+                    </button>
+                `;
+                return;
+            }
+
+            // Add choices with staggered animation
+            choices.forEach((choice, index) => {
+                const button = document.createElement('button');
+                button.className = 'choice-button';
+                button.textContent = choice.text;
+                button.style.animationDelay = `${index * 0.1}s`;
+                button.onclick = () => {
+                    loadScene(choice.nextScene);
+                };
+                container.appendChild(button);
+            });
+        }
+
+        // 🔄 Toggle functions
+        function toggleAudio() {
+            audioEnabled = !audioEnabled;
+            const btn = document.getElementById('audioBtn');
+            const video = document.getElementById('sceneVideo');
+
+            btn.textContent = audioEnabled ? '🔊 Audio ON' : '🔇 Audio OFF';
+            btn.classList.toggle('active');
+            video.muted = !audioEnabled;
+        }
+
+        function restartStory() {
+            const video = document.getElementById('sceneVideo');
+            video.pause();
+            startStory();
+        }
+
+        // 🔄 UI helpers
+        function showLoading(show, message = 'Loading...', progress = 0) {
+            const overlay = document.getElementById('loadingOverlay');
+            const status = document.getElementById('loadingStatus');
+            const progressBar = document.getElementById('progressBar');
+
+            if (show) {
+                overlay.classList.remove('hidden');
+                status.textContent = message;
+                progressBar.style.width = progress + '%';
+            } else {
+                overlay.classList.add('hidden');
+            }
+        }
+
+        function updateStatus(text) {
+            document.getElementById('status').textContent = text;
+        }
+
+        // 🎬 Initialize on load
+        window.addEventListener('load', async () => {
+            console.log('🎮 Interactive Story Platform Ready!');
+            console.log('🤖 Powered by Gemini AI + Veo 3.1 Video Generation');
+
+            // Check API health
+            try {
+                const health = await fetch('/api/health');
+                const data = await health.json();
+                console.log('📊 API Status:', data);
+
+                if (!data.geminiConfigured) {
+                    updateStatus('⚠️ Please add your Gemini API key to .env file');
+                }
+            } catch (error) {
+                console.error('Failed to check API health:', error);
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key >= '1' && e.key <= '3') {
+                const choices = document.querySelectorAll('.choice-button');
+                const index = parseInt(e.key) - 1;
+                if (choices[index]) {
+                    choices[index].click();
+                }
+            }
+            // Space to toggle audio
+            if (e.key === ' ' && e.target.tagName !== 'BUTTON') {
+                e.preventDefault();
+                toggleAudio();
+            }
+        });
+    </script>
+</body>
+</html>
