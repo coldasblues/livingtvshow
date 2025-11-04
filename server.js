@@ -19,10 +19,10 @@ app.use(express.static('.'));
 // 🤖 Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Models - Hybrid Architecture
-const textModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // For text generation
-const videoModel = genAI.getGenerativeModel({ model: 'veo-003' }); // For video generation with native audio!
-const orchestratorModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' }); // For intelligent orchestration
+// Models - Hybrid Architecture (Updated to use available models)
+const textModel = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' }); // Fast story generation
+const orchestratorModel = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' }); // Intelligent orchestration
+// Note: Video models (Veo) not publicly available yet - using placeholder mode
 
 // 📚 Initialize Story Generator (modular component)
 const storyGenerator = new StoryGenerator({
@@ -31,8 +31,9 @@ const storyGenerator = new StoryGenerator({
 });
 
 // 🎥 Initialize Video Generator (modular component)
+// Using placeholder mode since Veo video models are not publicly available yet
 const videoGenerator = new VideoGenerator({
-    videoModel: videoModel,
+    usePlaceholder: true,  // No video API available yet
     defaultDuration: 8,
     maxRetries: 3,
     retryDelay: 1000
@@ -488,9 +489,9 @@ app.get('/api/health', (req, res) => {
         status: 'healthy',
         geminiConfigured: !!process.env.GEMINI_API_KEY,
         models: {
-            text: 'gemini-2.0-flash-exp',
-            video: 'veo-003 (with native audio)',
-            orchestrator: 'gemini-1.5-pro'
+            text: 'gemini-2.5-flash',
+            orchestrator: 'gemini-2.5-pro',
+            video: 'placeholder (Veo not yet available)'
         },
         features: {
             dynamicStoryGeneration: true,
@@ -498,7 +499,8 @@ app.get('/api/health', (req, res) => {
             contentFiltering: true,
             choicesPerScene: 4,
             episodeOrchestration: true,
-            narrativeCoherence: true
+            narrativeCoherence: true,
+            videoPlaceholder: true
         }
     });
 });
@@ -507,17 +509,17 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
-    🎮 Interactive Story Platform - Gemini AI Hybrid Architecture!
+    🎮 Interactive Story Platform - Gemini 2.5 Powered!
     📍 Running at: http://localhost:${PORT}
 
-    🤖 AI Models - Three-Tier Architecture:
-    🧠 Orchestrator: Gemini 1.5 Pro (intelligent coordination)
-    ✅ Text Generation: Gemini 2.0 Flash (story content)
-    🎥 Video Generation: Veo 3.1 (with native audio!)
+    🤖 AI Models - Optimized Configuration:
+    🧠 Orchestrator: Gemini 2.5 Pro (intelligent coordination)
+    ⚡ Story Generation: Gemini 2.5 Flash (fast & high-quality)
+    🎬 Video: Placeholder mode (Veo not yet publicly available)
 
-    ✨ New Episode Orchestration Features:
+    ✨ Episode Orchestration Features:
     🎬 Complete episode generation (3-7 segments)
-    📋 Narrative arc planning by Gemini Pro
+    📋 Narrative arc planning with Gemini 2.5 Pro
     🔍 Automatic coherence checking between segments
     ✨ AI-enhanced video prompts for better visuals
     🎯 Intelligent pacing decisions
@@ -526,17 +528,16 @@ app.listen(PORT, () => {
     💡 Key Features:
     - Create custom characters (name, gender, description)
     - Full episodes with narrative coherence
-    - 8-second video clips for each segment
-    - Native audio/dialogue in videos
-    - AI-coordinated story flow
+    - AI-coordinated story flow with Gemini 2.5
     - Smart branching and pacing
-    - 720p or 1080p video resolution
+    - Placeholder videos (consistent, no API errors)
+    - Ready for Veo when publicly released
 
     🔌 API Endpoints:
     - POST /api/generate-episode (full orchestrated episode)
     - POST /api/generate-story (single scene)
     - POST /api/generate-next-scene (scene continuation)
-    - POST /api/generate-video (video only)
+    - POST /api/generate-video (placeholder video)
     - GET  /api/episode-status (current episode state)
     - POST /api/reset-episode (reset orchestrator)
     - GET  /api/health (system status)
@@ -550,6 +551,6 @@ app.listen(PORT, () => {
 
     ${process.env.GEMINI_API_KEY === 'your_gemini_api_key_here' ?
         '⚠️  WARNING: Please add your Gemini API key to .env file!' :
-        '✅ Gemini API key configured - Ready to orchestrate stories!'}
+        '✅ Gemini 2.5 configured - Ready to generate amazing stories!'}
     `);
 });
