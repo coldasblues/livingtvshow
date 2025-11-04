@@ -31,23 +31,190 @@
             box-shadow: 0 30px 80px rgba(0,0,0,0.3);
         }
 
+        /* Character Creation Screen */
+        .character-creation {
+            padding: 60px 40px;
+            text-align: center;
+            min-height: 600px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .character-creation h1 {
+            font-size: 36px;
+            color: #667eea;
+            margin-bottom: 40px;
+        }
+
+        /* Coin Flip Animation */
+        .coin-container {
+            perspective: 1000px;
+            margin: 30px auto;
+        }
+
+        .coin {
+            width: 150px;
+            height: 150px;
+            position: relative;
+            transform-style: preserve-3d;
+            margin: 0 auto;
+            cursor: pointer;
+            transition: transform 0.1s;
+        }
+
+        .coin:hover {
+            transform: scale(1.05);
+        }
+
+        .coin.flipping {
+            animation: flip 1s ease-out;
+        }
+
+        @keyframes flip {
+            0% { transform: rotateY(0); }
+            100% { transform: rotateY(1800deg); }
+        }
+
+        .coin-face {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            backface-visibility: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 60px;
+            font-weight: bold;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .coin-face.male {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .coin-face.female {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            transform: rotateY(180deg);
+        }
+
+        .gender-selection {
+            margin: 20px 0;
+            font-size: 24px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .flip-instruction {
+            color: #666;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        /* Character Form */
+        .character-form {
+            max-width: 500px;
+            margin: 40px auto 0;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .form-hint {
+            font-size: 13px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .generate-button {
+            width: 100%;
+            padding: 18px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-top: 20px;
+        }
+
+        .generate-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+        }
+
+        .generate-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .error-message {
+            background: #fee;
+            color: #c33;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Scene Display */
         .scene-display {
             position: relative;
             width: 100%;
             height: 500px;
             background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
             overflow: hidden;
+            display: none;
+        }
+
+        .scene-display.show {
+            display: block;
         }
 
         .scene-video {
             width: 100%;
             height: 100%;
             object-fit: cover;
-        }
-
-        @keyframes slowZoom {
-            0% { transform: scale(1); }
-            100% { transform: scale(1.1); }
         }
 
         .loading-overlay {
@@ -91,12 +258,6 @@
             background: linear-gradient(90deg, #667eea, #764ba2);
             width: 0%;
             transition: width 0.3s ease;
-            animation: shimmer 2s infinite;
-        }
-
-        @keyframes shimmer {
-            0% { transform: translateX(-100%); }
-            100% { transform: translateX(100%); }
         }
 
         .typing-indicator {
@@ -148,7 +309,12 @@
         .choices-container {
             padding: 30px;
             background: linear-gradient(to bottom, #f8f9fa, #ffffff);
-            min-height: 150px;
+            min-height: 200px;
+            display: none;
+        }
+
+        .choices-container.show {
+            display: block;
         }
 
         .choice-button {
@@ -166,6 +332,7 @@
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
+            text-align: left;
         }
 
         .choice-button::before {
@@ -195,11 +362,15 @@
             padding: 20px 30px;
             background: white;
             border-top: 1px solid #e9ecef;
-            display: flex;
+            display: none;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
             gap: 10px;
+        }
+
+        .controls.show {
+            display: flex;
         }
 
         .control-button {
@@ -256,6 +427,23 @@
 
         /* Mobile responsive */
         @media (max-width: 768px) {
+            .character-creation {
+                padding: 40px 20px;
+            }
+
+            .character-creation h1 {
+                font-size: 28px;
+            }
+
+            .coin {
+                width: 120px;
+                height: 120px;
+            }
+
+            .coin-face {
+                font-size: 50px;
+            }
+
             .scene-display {
                 height: 300px;
             }
@@ -273,8 +461,55 @@
 </head>
 <body>
     <div class="story-container">
+        <!-- 🎭 Character Creation Screen -->
+        <div class="character-creation" id="characterCreation">
+            <h1>Create Your Character</h1>
+
+            <!-- Coin Flip for Gender -->
+            <div class="coin-container">
+                <div class="coin" id="coin" onclick="flipCoin()">
+                    <div class="coin-face male">♂</div>
+                    <div class="coin-face female">♀</div>
+                </div>
+            </div>
+
+            <div class="gender-selection" id="genderDisplay">Click coin to choose gender</div>
+            <p class="flip-instruction">Flip the coin to randomly select your character's gender</p>
+
+            <!-- Character Form -->
+            <form class="character-form" id="characterForm" onsubmit="generateStory(event)">
+                <div class="form-group">
+                    <label for="characterName">Character Name</label>
+                    <input
+                        type="text"
+                        id="characterName"
+                        placeholder="Enter character name"
+                        required
+                        maxlength="50"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="characterDescription">Character Description</label>
+                    <textarea
+                        id="characterDescription"
+                        placeholder="e.g., a gas station worker, a detective, a student..."
+                        required
+                        maxlength="200"
+                    ></textarea>
+                    <div class="form-hint">Describe your character's occupation or role</div>
+                </div>
+
+                <button type="submit" class="generate-button" id="generateButton">
+                    Generate Your Story 🎬
+                </button>
+
+                <div class="error-message" id="errorMessage"></div>
+            </form>
+        </div>
+
         <!-- 🎬 Scene Display -->
-        <div class="scene-display">
+        <div class="scene-display" id="sceneDisplay">
             <video class="scene-video" id="sceneVideo" autoplay loop muted>
                 <source src="" type="video/mp4">
                 Your browser does not support the video tag.
@@ -307,31 +542,27 @@
             <!-- Scene Text Overlay -->
             <div class="text-overlay">
                 <p class="scene-text" id="sceneText">
-                    Welcome to the Interactive Story Platform powered by Gemini AI.
-                    Every scene is a cinematic video with synchronized audio, created in real-time.
-                    Your choices shape the narrative. Are you ready to begin?
+                    Your story will begin here...
                 </p>
             </div>
         </div>
 
         <!-- 🎮 Choices -->
         <div class="choices-container" id="choicesContainer">
-            <button class="choice-button" onclick="startStory()">
-                Begin Your Cinematic Adventure 🎬
-            </button>
+            <!-- Choices will be dynamically added here -->
         </div>
 
         <!-- 🎛️ Controls -->
-        <div class="controls">
+        <div class="controls" id="controls">
             <div>
                 <button class="control-button active" id="audioBtn" onclick="toggleAudio()">
                     🔊 Audio ON
                 </button>
                 <button class="control-button" onclick="restartStory()">
-                    🔄 Restart
+                    🔄 New Character
                 </button>
             </div>
-            <span class="status" id="status">Ready to experience AI-generated video stories...</span>
+            <span class="status" id="status">Ready to create your character...</span>
         </div>
     </div>
 
@@ -339,35 +570,120 @@
         // 🎮 INTERACTIVE STORY PLATFORM - Gemini AI Frontend Controller
 
         // State management
-        let currentStory = 'detective';
+        let currentCharacter = {
+            name: '',
+            gender: null,
+            description: ''
+        };
         let currentScene = null;
         let audioEnabled = true;
         let storyHistory = [];
+        let flipCount = 0;
 
-        // 🚀 Initialize story
-        async function startStory() {
-            console.log('🎬 Starting story...');
-            storyHistory = [];
-            await loadScene('opening');
+        // 🪙 Coin Flip Animation
+        function flipCoin() {
+            const coin = document.getElementById('coin');
+            const genderDisplay = document.getElementById('genderDisplay');
+
+            // Add flipping animation
+            coin.classList.add('flipping');
+            flipCount++;
+
+            // Random result after animation
+            setTimeout(() => {
+                const result = Math.random() < 0.5 ? 'male' : 'female';
+                currentCharacter.gender = result;
+
+                // Update display
+                genderDisplay.textContent = result === 'male' ? '♂ Male Character' : '♀ Female Character';
+                genderDisplay.style.color = result === 'male' ? '#667eea' : '#f5576c';
+
+                // Set final rotation based on result
+                if (result === 'female') {
+                    coin.style.transform = 'rotateY(180deg)';
+                } else {
+                    coin.style.transform = 'rotateY(0deg)';
+                }
+
+                coin.classList.remove('flipping');
+            }, 1000);
         }
 
-        // 📖 Load a scene
-        async function loadScene(sceneId) {
+        // 📝 Generate Story
+        async function generateStory(event) {
+            event.preventDefault();
+
+            const name = document.getElementById('characterName').value.trim();
+            const description = document.getElementById('characterDescription').value.trim();
+            const errorMsg = document.getElementById('errorMessage');
+            const generateBtn = document.getElementById('generateButton');
+
+            // Validate inputs
+            if (!currentCharacter.gender) {
+                errorMsg.textContent = 'Please flip the coin to select a gender first!';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            if (!name || !description) {
+                errorMsg.textContent = 'Please fill in all fields!';
+                errorMsg.classList.add('show');
+                return;
+            }
+
+            // Update character
+            currentCharacter.name = name;
+            currentCharacter.description = description;
+
+            // Disable button and show loading
+            generateBtn.disabled = true;
+            generateBtn.textContent = 'Generating Story...';
+            errorMsg.classList.remove('show');
+
             try {
-                showLoading(true, 'Loading scene data...', 10);
+                // Call API to generate story
+                const response = await fetch('/api/generate-story', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(currentCharacter)
+                });
 
-                // Fetch scene data
-                const response = await fetch(`/api/story/${currentStory}/${sceneId}`);
-                if (!response.ok) throw new Error('Failed to load scene');
+                const data = await response.json();
 
-                const scene = await response.json();
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate story');
+                }
+
+                // Hide character creation, show story
+                document.getElementById('characterCreation').classList.add('hidden');
+                document.getElementById('sceneDisplay').classList.add('show');
+                document.getElementById('choicesContainer').classList.add('show');
+                document.getElementById('controls').classList.add('show');
+
+                // Load the opening scene
+                await loadGeneratedScene(data.scene);
+
+            } catch (error) {
+                console.error('Error generating story:', error);
+                errorMsg.textContent = error.message;
+                errorMsg.classList.add('show');
+                generateBtn.disabled = false;
+                generateBtn.textContent = 'Generate Your Story 🎬';
+            }
+        }
+
+        // 📖 Load a generated scene
+        async function loadGeneratedScene(scene) {
+            try {
+                showLoading(true, 'Creating your opening scene...', 10);
+
                 currentScene = scene;
                 storyHistory.push(scene);
 
                 // Update progress
                 showLoading(true, 'Generating video with Veo 3.1...', 30);
 
-                // Generate video with Gemini Veo 3.1 (includes audio!)
+                // Generate video
                 const videoResponse = await fetch('/api/generate-video', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -384,7 +700,7 @@
                 // Update video source
                 const video = document.getElementById('sceneVideo');
                 video.src = videoData.videoUrl;
-                video.muted = !audioEnabled; // Video includes native audio from Veo
+                video.muted = !audioEnabled;
 
                 // Update text
                 document.getElementById('sceneText').textContent = scene.narrationText;
@@ -402,39 +718,24 @@
                 displayChoices(scene.choices);
 
                 // Update status
-                if (videoData.isPlaceholder) {
-                    updateStatus(`Scene: ${sceneId} (using placeholder - add Gemini API key)`);
-                } else {
-                    updateStatus(`Scene: ${sceneId} - Video generated with native audio`);
-                }
+                updateStatus(`Scene: ${scene.id || 'Opening'}`);
 
             } catch (error) {
-                console.error('❌ Error loading scene:', error);
-                updateStatus('Error loading scene. Please check console and try again.');
+                console.error('Error loading scene:', error);
+                updateStatus('Error loading scene. Please try again.');
                 showLoading(false);
-
-                // Show retry button
-                const container = document.getElementById('choicesContainer');
-                container.innerHTML = `
-                    <button class="choice-button" onclick="loadScene('${sceneId}')">
-                        🔄 Retry Scene
-                    </button>
-                    <button class="choice-button" onclick="startStory()">
-                        🏠 Restart Story
-                    </button>
-                `;
             }
         }
 
-        // 🎯 Display choice buttons
+        // 🎯 Display choice buttons (now 4 choices)
         function displayChoices(choices) {
             const container = document.getElementById('choicesContainer');
             container.innerHTML = '';
 
             if (!choices || choices.length === 0) {
                 container.innerHTML = `
-                    <button class="choice-button" onclick="startStory()">
-                        📖 Start New Story
+                    <button class="choice-button" onclick="restartStory()">
+                        🔄 Create New Character
                     </button>
                 `;
                 return;
@@ -444,13 +745,44 @@
             choices.forEach((choice, index) => {
                 const button = document.createElement('button');
                 button.className = 'choice-button';
-                button.textContent = choice.text;
+                button.textContent = `${index + 1}. ${choice.text}`;
                 button.style.animationDelay = `${index * 0.1}s`;
-                button.onclick = () => {
-                    loadScene(choice.nextScene);
+                button.onclick = async () => {
+                    await generateNextScene(choice.text);
                 };
                 container.appendChild(button);
             });
+        }
+
+        // 🔄 Generate next scene based on choice
+        async function generateNextScene(choiceText) {
+            try {
+                showLoading(true, 'Generating next scene...', 20);
+
+                const response = await fetch('/api/generate-next-scene', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        character: currentCharacter,
+                        previousScene: currentScene,
+                        playerChoice: choiceText,
+                        storyHistory: storyHistory.map(s => s.narrationText)
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to generate next scene');
+                }
+
+                await loadGeneratedScene(data.scene);
+
+            } catch (error) {
+                console.error('Error generating next scene:', error);
+                updateStatus('Error generating scene: ' + error.message);
+                showLoading(false);
+            }
         }
 
         // 🔄 Toggle functions
@@ -465,9 +797,33 @@
         }
 
         function restartStory() {
+            // Reset state
+            currentCharacter = { name: '', gender: null, description: '' };
+            currentScene = null;
+            storyHistory = [];
+            flipCount = 0;
+
+            // Reset UI
+            document.getElementById('characterCreation').classList.remove('hidden');
+            document.getElementById('sceneDisplay').classList.remove('show');
+            document.getElementById('choicesContainer').classList.remove('show');
+            document.getElementById('controls').classList.remove('show');
+
+            // Reset form
+            document.getElementById('characterForm').reset();
+            document.getElementById('genderDisplay').textContent = 'Click coin to choose gender';
+            document.getElementById('genderDisplay').style.color = '#667eea';
+            document.getElementById('coin').style.transform = 'rotateY(0deg)';
+            document.getElementById('errorMessage').classList.remove('show');
+            document.getElementById('generateButton').disabled = false;
+            document.getElementById('generateButton').textContent = 'Generate Your Story 🎬';
+
+            // Pause video
             const video = document.getElementById('sceneVideo');
             video.pause();
-            startStory();
+            video.src = '';
+
+            updateStatus('Ready to create your character...');
         }
 
         // 🔄 UI helpers
@@ -510,7 +866,7 @@
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            if (e.key >= '1' && e.key <= '3') {
+            if (e.key >= '1' && e.key <= '4') {
                 const choices = document.querySelectorAll('.choice-button');
                 const index = parseInt(e.key) - 1;
                 if (choices[index]) {
@@ -518,7 +874,7 @@
                 }
             }
             // Space to toggle audio
-            if (e.key === ' ' && e.target.tagName !== 'BUTTON') {
+            if (e.key === ' ' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
                 e.preventDefault();
                 toggleAudio();
             }
