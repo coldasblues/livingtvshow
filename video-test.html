@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Video Generation Test - Gemini Veo 3.1</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.loading {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .video-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .video-container.show {
+            display: block;
+        }
+
+        video {
+            width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .response-container {
+            margin-top: 30px;
+            display: none;
+        }
+
+        .response-container.show {
+            display: block;
+        }
+
+        .response-header {
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            border: 1px solid #ddd;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .example {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+
+        .example-label {
+            font-weight: 600;
+            color: #667eea;
+            margin-bottom: 8px;
+        }
+
+        .example-text {
+            color: #555;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎥 Video Generation Test</h1>
+        <p class="subtitle">Test Gemini Veo 3.1 video generation in isolation</p>
+
+        <div class="example">
+            <div class="example-label">Example prompts to try:</div>
+            <div class="example-text">
+                • "A rainy night at a gas station with fluorescent lights"<br>
+                • "Coffee shop interior with warm lighting and people talking"<br>
+                • "Space station corridor with stars visible through windows"<br>
+                • "Medieval castle throne room with torches on stone walls"
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="sceneDescription">Scene Description</label>
+            <textarea
+                id="sceneDescription"
+                placeholder="Describe the scene you want to generate (e.g., 'A rainy night at a gas station with fluorescent lights and neon signs')"
+            ></textarea>
+        </div>
+
+        <button class="button" id="generateButton" onclick="generateVideo()">
+            🎬 Generate Video
+        </button>
+
+        <div class="status" id="status"></div>
+
+        <div class="video-container" id="videoContainer">
+            <h3>Generated Video:</h3>
+            <video id="videoPlayer" controls autoplay loop></video>
+        </div>
+
+        <div class="response-container" id="responseContainer">
+            <div class="response-header">Raw API Response:</div>
+            <pre id="responseData"></pre>
+        </div>
+    </div>
+
+    <script>
+        async function generateVideo() {
+            const description = document.getElementById('sceneDescription').value.trim();
+            const status = document.getElementById('status');
+            const button = document.getElementById('generateButton');
+            const videoContainer = document.getElementById('videoContainer');
+            const videoPlayer = document.getElementById('videoPlayer');
+            const responseContainer = document.getElementById('responseContainer');
+            const responseData = document.getElementById('responseData');
+
+            // Validate input
+            if (!description) {
+                showStatus('Please enter a scene description', 'error');
+                return;
+            }
+
+            // Reset UI
+            button.disabled = true;
+            videoContainer.classList.remove('show');
+            responseContainer.classList.remove('show');
+            showStatus('🎬 Generating video with Gemini Veo 3.1... This may take 30-60 seconds.', 'loading');
+
+            try {
+                const response = await fetch('/test-video', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ description })
+                });
+
+                const data = await response.json();
+
+                // Show raw response
+                responseData.textContent = JSON.stringify(data, null, 2);
+                responseContainer.classList.add('show');
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Video generation failed');
+                }
+
+                if (data.videoUrl) {
+                    // Success - show video
+                    videoPlayer.src = data.videoUrl;
+                    videoContainer.classList.add('show');
+                    showStatus('✅ Video generated successfully!', 'success');
+                } else if (data.placeholderVideo) {
+                    // Placeholder video
+                    videoPlayer.src = data.placeholderVideo;
+                    videoContainer.classList.add('show');
+                    showStatus('⚠️ Using placeholder video (API error occurred)', 'error');
+                } else {
+                    throw new Error('No video URL in response');
+                }
+
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus(`❌ Error: ${error.message}`, 'error');
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = `status show ${type}`;
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('sceneDescription').addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'Enter') {
+                generateVideo();
+            }
+        });
+    </script>
+</body>
+</html>

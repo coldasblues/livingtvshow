@@ -515,6 +515,108 @@ app.post('/api/enhance-narration', async (req, res) => {
     }
 });
 
+// 🧪 TEST ENDPOINT - Simple video generation test
+app.post('/test-video', async (req, res) => {
+    try {
+        console.log('🧪 TEST: Video generation test started...');
+        const { description } = req.body;
+
+        if (!description) {
+            return res.status(400).json({ error: 'Missing description parameter' });
+        }
+
+        console.log('📝 Test description:', description);
+
+        // Test 1: Try with minimal parameters (no generationConfig)
+        console.log('🔬 Test 1: Minimal parameters (no generationConfig)...');
+        try {
+            const result = await videoModel.generateContent({
+                contents: [{
+                    role: 'user',
+                    parts: [{
+                        text: description
+                    }]
+                }]
+            });
+
+            const response = result.response;
+            console.log('✅ Test 1 SUCCESS - Response received');
+            console.log('📦 Response structure:', JSON.stringify(response, null, 2));
+
+            // Try to extract video URL
+            const videoUrl = response.candidates?.[0]?.content?.parts?.[0]?.videoData?.uri ||
+                            response.candidates?.[0]?.content?.parts?.[0]?.fileData?.fileUri ||
+                            null;
+
+            return res.json({
+                success: true,
+                testType: 'minimal_parameters',
+                videoUrl: videoUrl,
+                fullResponse: response,
+                description: description
+            });
+
+        } catch (test1Error) {
+            console.error('❌ Test 1 FAILED:', test1Error.message);
+
+            // Test 2: Try with just temperature
+            console.log('🔬 Test 2: With temperature only...');
+            try {
+                const result = await videoModel.generateContent({
+                    contents: [{
+                        role: 'user',
+                        parts: [{
+                            text: description
+                        }]
+                    }],
+                    generationConfig: {
+                        temperature: 0.7
+                    }
+                });
+
+                const response = result.response;
+                console.log('✅ Test 2 SUCCESS - Response received');
+
+                const videoUrl = response.candidates?.[0]?.content?.parts?.[0]?.videoData?.uri ||
+                                response.candidates?.[0]?.content?.parts?.[0]?.fileData?.fileUri ||
+                                null;
+
+                return res.json({
+                    success: true,
+                    testType: 'temperature_only',
+                    videoUrl: videoUrl,
+                    fullResponse: response,
+                    description: description,
+                    note: 'Test 1 failed, Test 2 succeeded'
+                });
+
+            } catch (test2Error) {
+                console.error('❌ Test 2 FAILED:', test2Error.message);
+
+                // All tests failed - return detailed error info
+                return res.status(500).json({
+                    success: false,
+                    error: 'All video generation tests failed',
+                    test1Error: test1Error.message,
+                    test2Error: test2Error.message,
+                    description: description,
+                    note: 'Check server console for full error details',
+                    placeholderVideo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+                });
+            }
+        }
+
+    } catch (error) {
+        console.error('🔥 TEST ENDPOINT ERROR:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message,
+            stack: error.stack,
+            placeholderVideo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+        });
+    }
+});
+
 // 📊 Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({
