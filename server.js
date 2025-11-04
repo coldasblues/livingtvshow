@@ -169,9 +169,33 @@ app.post('/api/generate-story', async (req, res) => {
         // Generate explicit video prompt with visual details
         const explicitVideoBase = generateExplicitVideoPrompt(setting, themes);
 
+        // 🎲 Add variation elements to make each generation unique
+        const timeOfDayOptions = ['early morning', 'mid-morning', 'noon', 'afternoon', 'dusk', 'evening', 'late night', 'midnight', 'pre-dawn'];
+        const weatherOptions = ['clear skies', 'overcast', 'light rain', 'heavy rain', 'fog', 'mist', 'snow flurries', 'windy conditions', 'humid atmosphere', 'crisp air'];
+        const cameraAngles = ['wide establishing shot', 'close-up', 'medium shot', 'low angle', 'high angle', 'dutch angle', 'over-the-shoulder', 'tracking shot'];
+        const moodModifiers = ['tense', 'peaceful', 'ominous', 'hopeful', 'melancholic', 'energetic', 'mysterious', 'contemplative', 'anxious', 'serene'];
+
+        const randomTimeOfDay = timeOfDayOptions[Math.floor(Math.random() * timeOfDayOptions.length)];
+        const randomWeather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
+        const randomCamera = cameraAngles[Math.floor(Math.random() * cameraAngles.length)];
+        const randomMood = moodModifiers[Math.floor(Math.random() * moodModifiers.length)];
+        const randomSeed = Math.floor(Math.random() * 1000000);
+
+        console.log(`🎲 Variation: ${randomTimeOfDay}, ${randomWeather}, ${randomCamera}, ${randomMood} (seed: ${randomSeed})`);
+
         // Build prompt that ENFORCES setting and theme consistency
         const themesText = themes.length > 0 ? themes.join(', ') : 'general adventure';
         const prompt = `Create a story with these EXACT specifications:
+
+VARIATION SEED: ${randomSeed} (Use this to create a unique opening - never repeat the same scenario)
+
+TIME & ATMOSPHERE:
+- Time of day: ${randomTimeOfDay}
+- Weather/Atmosphere: ${randomWeather}
+- Camera style: ${randomCamera}
+- Overall mood: ${randomMood}
+
+Create a story with these EXACT specifications:
 
 CHARACTER: ${name}, a ${gender} ${description}
 SETTING: ${setting} (MUST be the PRIMARY location - this is CRITICAL)
@@ -181,9 +205,12 @@ VISUAL ELEMENTS: ${explicitVideoBase}
 CRITICAL RULES - MUST FOLLOW:
 1. The videoPrompt MUST START with "${setting}" or "${name} at ${setting}"
 2. The videoPrompt MUST include these visual elements: ${explicitVideoBase}
-3. The narration MUST take place at "${setting}"
-4. The story MUST incorporate these themes: ${themesText}
-5. Opening scene happens at ${setting} - nowhere else
+3. INCORPORATE the time (${randomTimeOfDay}) and weather (${randomWeather}) into the scene
+4. Use ${randomCamera} perspective and capture a ${randomMood} mood
+5. The narration MUST take place at "${setting}"
+6. The story MUST incorporate these themes: ${themesText}
+7. Opening scene happens at ${setting} - nowhere else
+8. Create a UNIQUE scenario - avoid generic openings
 
 LOCATION ENFORCEMENT:
 - Primary setting: ${setting}
@@ -196,8 +223,8 @@ Generate EXACTLY 4 meaningful choices that reflect the themes: ${themesText}
 Return ONLY valid JSON with this exact structure:
 {
     "id": "opening",
-    "videoPrompt": "${setting}, ${explicitVideoBase}, ${name} the ${description} is present, [add cinematic details: lighting, camera angle, atmosphere matching ${themesText}]",
-    "narrationText": "Story opening at ${setting} (100-150 words). Incorporate ${themesText} themes. MUST mention ${setting} explicitly. ${name} is a ${description}.",
+    "videoPrompt": "${setting}, ${explicitVideoBase}, ${randomTimeOfDay}, ${randomWeather}, ${randomCamera}, ${name} the ${description} is present, ${randomMood} atmosphere, [add unique cinematic details matching ${themesText}]",
+    "narrationText": "Story opening at ${setting} during ${randomTimeOfDay} with ${randomWeather} (100-150 words). Incorporate ${themesText} themes and ${randomMood} mood. MUST mention ${setting} explicitly. ${name} is a ${description}. Make this scenario UNIQUE.",
     "explicitSetting": "${setting}",
     "themes": ${JSON.stringify(themes)},
     "choices": [
@@ -208,13 +235,15 @@ Return ONLY valid JSON with this exact structure:
     ]
 }
 
-EXAMPLE for Setting:"Gas station", Character:"Morgan, night worker", Themes:"Mystery":
+EXAMPLE for Setting:"Gas station", Character:"Morgan, night worker", Themes:"Mystery" with variations:
 {
-    "videoPrompt": "Gas station with gas pumps, neon signs, convenience store, fluorescent lights, fuel dispensers, fog effects, mysterious lighting, Morgan the night worker present, late shift atmosphere, noir cinematography",
-    "narrationText": "The gas station's fluorescent lights cast long shadows across the empty lot. Morgan's shift had been quiet - too quiet. Then the stranger arrived...",
+    "videoPrompt": "Gas station with gas pumps, neon signs, convenience store, fluorescent lights, fuel dispensers, late night, fog, low angle shot, Morgan the night worker present, ominous atmosphere, noir cinematography, mysterious figure approaching from distance",
+    "narrationText": "Late night fog rolls across the gas station lot. Morgan's shift had been quiet until a car with no headlights pulled up to pump 3. The driver sat motionless, staring at the convenience store windows...",
     "explicitSetting": "Gas station",
     ...
 }
+
+IMPORTANT: Each generation should feel FRESH and DIFFERENT - vary the specific situation, conflict, or hook while maintaining the setting and themes.
 
 Make it cinematic, engaging, and appropriate for all audiences. The setting ${setting} is NON-NEGOTIABLE.`;
 
