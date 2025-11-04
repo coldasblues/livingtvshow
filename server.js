@@ -5,6 +5,7 @@ const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const StoryGenerator = require('./story-generator.js');
+const VideoGenerator = require('./video-generator.js');
 require('dotenv').config();
 
 const app = express();
@@ -25,6 +26,14 @@ const videoModel = genAI.getGenerativeModel({ model: 'veo-003' }); // For video 
 const storyGenerator = new StoryGenerator({
     textModel: textModel,
     contentFilter: checkContentFilter  // Will be defined below
+});
+
+// 🎥 Initialize Video Generator (modular component)
+const videoGenerator = new VideoGenerator({
+    videoModel: videoModel,
+    defaultDuration: 8,
+    maxRetries: 3,
+    retryDelay: 1000
 });
 
 // 🚫 Content Filter - Checks for inappropriate content
@@ -283,75 +292,37 @@ Keep it appropriate, engaging, and suitable for all audiences. Make each choice 
 });
 
 // 🎥 Generate Video using Veo 3.1 (includes native audio!)
+// 🎥 Generate Video - Uses modular VideoGenerator
 app.post('/api/generate-video', async (req, res) => {
     try {
-        console.log('🎥 Generating video with Veo 3.1 (includes audio!)...');
-        const { prompt, narration, duration = 8, videoInstruction } = req.body;
+        const { prompt, narration, duration, videoInstruction, id } = req.body;
 
         // Content filter on prompts
-        const promptFilter = checkContentFilter(prompt);
-        if (!promptFilter.passed) {
-            return res.status(400).json({ error: 'Video prompt failed content filter' });
-        }
-
-        // Build the video prompt with location enforcement
-        let enhancedPrompt = prompt;
-
-        // If videoInstruction exists (location enforcement), prepend it
-        if (videoInstruction) {
-            enhancedPrompt = `${videoInstruction}. ${prompt}`;
-            console.log('📍 Location enforced in video generation');
-        }
-
-        // Combine visual prompt with narration for better audio generation
-        const fullPrompt = `${enhancedPrompt}. ${narration ? 'Narration: ' + narration : ''}`;
-
-        console.log('📝 Video prompt:', fullPrompt.substring(0, 150) + '...');
-
-        // Generate video with Veo 3.1 - includes synchronized audio!
-        const result = await videoModel.generateContent({
-            contents: [{
-                role: 'user',
-                parts: [{
-                    text: fullPrompt
-                }]
-            }],
-            generationConfig: {
-                temperature: 0.7,
-                // Video generation parameters
-                videoLength: duration, // seconds
-                aspectRatio: '16:9'
+        if (prompt) {
+            const promptFilter = checkContentFilter(prompt);
+            if (!promptFilter.passed) {
+                return res.status(400).json({ error: 'Video prompt failed content filter' });
             }
-        });
+        }
 
-        const response = result.response;
-
-        // Extract video URL from response
-        // Note: The actual response structure may vary - check Gemini API docs
-        const videoUrl = response.candidates[0]?.content?.parts[0]?.videoData?.uri ||
-                        response.candidates[0]?.content?.parts[0]?.fileData?.fileUri;
-
-        console.log('✅ Video generated with native audio!');
-
-        res.json({
-            videoUrl: videoUrl,
-            hasAudio: true, // Veo 3.1 always includes audio
+        // Build scene description for VideoGenerator
+        const sceneDescription = {
+            videoPrompt: prompt,
+            narrationText: narration,
+            videoInstruction: videoInstruction,
             duration: duration,
-            prompt: fullPrompt
-        });
+            id: id
+        };
+
+        // Use VideoGenerator to create the video
+        const result = await videoGenerator.generateVideo(sceneDescription);
+
+        res.json(result);
 
     } catch (error) {
         console.error('❌ Video generation error:', error);
-
-        // Return placeholder video for development/testing
-        res.json({
-            videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-            hasAudio: true,
-            duration: 8,
-            prompt: req.body.prompt,
-            isPlaceholder: true,
-            error: error.message
-        });
+        const placeholder = videoGenerator.getPlaceholderVideo(req.body.prompt, error);
+        res.json(placeholder);
     }
 });
 
@@ -382,104 +353,42 @@ app.post('/api/enhance-narration', async (req, res) => {
     }
 });
 
-// 🧪 TEST ENDPOINT - Simple video generation test
+// 🧪 TEST ENDPOINT - Simple video generation test using VideoGenerator
 app.post('/test-video', async (req, res) => {
     try {
-        console.log('🧪 TEST: Video generation test started...');
         const { description } = req.body;
 
         if (!description) {
             return res.status(400).json({ error: 'Missing description parameter' });
         }
 
-        console.log('📝 Test description:', description);
+        console.log('🧪 TEST: Generating video with VideoGenerator...');
 
-        // Test 1: Try with minimal parameters (no generationConfig)
-        console.log('🔬 Test 1: Minimal parameters (no generationConfig)...');
-        try {
-            const result = await videoModel.generateContent({
-                contents: [{
-                    role: 'user',
-                    parts: [{
-                        text: description
-                    }]
-                }]
-            });
+        // Use VideoGenerator with retry logic built-in
+        const sceneDescription = {
+            videoPrompt: description,
+            narrationText: null,
+            id: `test-${Date.now()}`
+        };
 
-            const response = result.response;
-            console.log('✅ Test 1 SUCCESS - Response received');
-            console.log('📦 Response structure:', JSON.stringify(response, null, 2));
+        const result = await videoGenerator.generateVideo(sceneDescription);
 
-            // Try to extract video URL
-            const videoUrl = response.candidates?.[0]?.content?.parts?.[0]?.videoData?.uri ||
-                            response.candidates?.[0]?.content?.parts?.[0]?.fileData?.fileUri ||
-                            null;
-
-            return res.json({
-                success: true,
-                testType: 'minimal_parameters',
-                videoUrl: videoUrl,
-                fullResponse: response,
-                description: description
-            });
-
-        } catch (test1Error) {
-            console.error('❌ Test 1 FAILED:', test1Error.message);
-
-            // Test 2: Try with just temperature
-            console.log('🔬 Test 2: With temperature only...');
-            try {
-                const result = await videoModel.generateContent({
-                    contents: [{
-                        role: 'user',
-                        parts: [{
-                            text: description
-                        }]
-                    }],
-                    generationConfig: {
-                        temperature: 0.7
-                    }
-                });
-
-                const response = result.response;
-                console.log('✅ Test 2 SUCCESS - Response received');
-
-                const videoUrl = response.candidates?.[0]?.content?.parts?.[0]?.videoData?.uri ||
-                                response.candidates?.[0]?.content?.parts?.[0]?.fileData?.fileUri ||
-                                null;
-
-                return res.json({
-                    success: true,
-                    testType: 'temperature_only',
-                    videoUrl: videoUrl,
-                    fullResponse: response,
-                    description: description,
-                    note: 'Test 1 failed, Test 2 succeeded'
-                });
-
-            } catch (test2Error) {
-                console.error('❌ Test 2 FAILED:', test2Error.message);
-
-                // All tests failed - return detailed error info
-                return res.status(500).json({
-                    success: false,
-                    error: 'All video generation tests failed',
-                    test1Error: test1Error.message,
-                    test2Error: test2Error.message,
-                    description: description,
-                    note: 'Check server console for full error details',
-                    placeholderVideo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
-                });
-            }
-        }
+        res.json({
+            success: !result.isPlaceholder,
+            videoUrl: result.videoUrl,
+            fullResponse: result,
+            description: description,
+            testUsed: 'VideoGenerator with retry logic',
+            cacheStats: videoGenerator.getCacheStats()
+        });
 
     } catch (error) {
         console.error('🔥 TEST ENDPOINT ERROR:', error);
+        const placeholder = videoGenerator.getPlaceholderVideo(req.body.description, error);
         res.status(500).json({
             success: false,
             error: error.message,
-            stack: error.stack,
-            placeholderVideo: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+            ...placeholder
         });
     }
 });
