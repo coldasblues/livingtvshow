@@ -683,14 +683,15 @@
                 // Update progress
                 showLoading(true, 'Generating video with Veo 3.1...', 30);
 
-                // Generate video
+                // Generate video with location enforcement
                 const videoResponse = await fetch('/api/generate-video', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         prompt: scene.videoPrompt,
                         narration: scene.narrationText,
-                        duration: 8
+                        duration: 8,
+                        videoInstruction: scene.videoInstruction // Enforce location consistency
                     })
                 });
 

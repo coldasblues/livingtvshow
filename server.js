@@ -54,6 +54,42 @@ function checkContentFilter(text) {
     return { passed: true };
 }
 
+// 🎯 Validate Scene Consistency - Ensures location is in video prompt
+function validateSceneConsistency(scene, description, name) {
+    const keywords = description.toLowerCase().split(' ').filter(w => w.length > 3);
+    let hasLocation = false;
+
+    // Check if video prompt contains any significant keywords from description
+    for (const word of keywords) {
+        if (scene.videoPrompt.toLowerCase().includes(word)) {
+            hasLocation = true;
+            break;
+        }
+    }
+
+    // If location missing, force it into the prompt
+    if (!hasLocation) {
+        console.warn('⚠️ Video prompt missing location:', description);
+        scene.videoPrompt = `${name} at ${description}, ${scene.videoPrompt}`;
+    }
+
+    // Ensure narration mentions the setting
+    const narrationLower = scene.narrationText.toLowerCase();
+    let hasNarrationLocation = false;
+    for (const word of keywords) {
+        if (narrationLower.includes(word)) {
+            hasNarrationLocation = true;
+            break;
+        }
+    }
+
+    if (!hasNarrationLocation) {
+        console.warn('⚠️ Narration missing location context:', description);
+    }
+
+    return scene;
+}
+
 // 🎬 Generate Initial Story - Creates opening scene based on character
 app.post('/api/generate-story', async (req, res) => {
     try {
@@ -78,35 +114,48 @@ app.post('/api/generate-story', async (req, res) => {
 
         console.log(`📝 Creating story for ${gender} character: ${name}, ${description}`);
 
-        const prompt = `You are a creative story writer. Create an engaging opening scene for an interactive story.
+        // Extract setting/location from description
+        const setting = description.toLowerCase();
 
-Character Details:
-- Name: ${name}
-- Gender: ${gender}
-- Description: ${description}
+        // Build prompt that ENFORCES location consistency
+        const prompt = `Create a story for ${name} (${gender}) who is described as: "${description}"
 
-Generate an opening scene that:
-1. Sets up an interesting situation for this character
-2. Creates atmosphere and mood
-3. Presents 4 meaningful choices (EXACTLY 4 - not 3, not 5)
-4. Includes a vivid video description for an 8-second cinematic clip
+CRITICAL RULES - MUST FOLLOW:
+1. The videoPrompt MUST START with "${name} at ${description}" or "${name} in ${description}"
+2. The narration MUST take place at the location mentioned in "${description}"
+3. Include specific visual details about the "${description}" setting
+4. The story should begin at this exact location
 
-IMPORTANT: Generate EXACTLY 4 choices - no more, no less.
+LOCATION ENFORCEMENT:
+- Primary setting: ${description}
+- Character is currently AT/IN this location
+- Video must SHOW this specific setting
+- Opening scene happens HERE
 
-Format as JSON:
+Generate EXACTLY 4 meaningful choices (not 3, not 5).
+
+Return ONLY valid JSON with this exact structure:
 {
     "id": "opening",
-    "videoPrompt": "Cinematic description of the 8-second video scene (include character appearance, setting, lighting, mood)",
-    "narrationText": "2-3 sentences describing what's happening to ${name}",
+    "videoPrompt": "${name} at ${description}, [add 15 more cinematic words describing this specific location, lighting, atmosphere, camera angle]",
+    "narrationText": "Story opening that takes place at the ${description} location (100-150 words). MUST mention the ${description} setting explicitly.",
+    "setting": "${description}",
     "choices": [
-        {"text": "First meaningful choice"},
-        {"text": "Second meaningful choice"},
-        {"text": "Third meaningful choice"},
-        {"text": "Fourth meaningful choice"}
+        {"text": "🔍 Investigate something mysterious here", "genre": "mystery"},
+        {"text": "⚔️ Take action in this situation", "genre": "action"},
+        {"text": "💬 Interact with someone at this location", "genre": "drama"},
+        {"text": "🎲 Something unexpected happens", "genre": "random"}
     ]
 }
 
-Keep it appropriate, engaging, and suitable for all audiences. Make the video prompt cinematic and detailed for Veo 3.1 generation.`;
+EXAMPLE for "Morgan, gas station worker":
+{
+    "videoPrompt": "Morgan at gas station, fluorescent lights humming, fuel pumps visible in frame, late night shift, empty parking lot, convenience store glowing behind them",
+    "narrationText": "Another slow night at the gas station where Morgan works the graveyard shift. The fluorescent lights buzz overhead as Morgan...",
+    ...
+}
+
+Make it cinematic, engaging, and appropriate for all audiences.`;
 
         const result = await textModel.generateContent(prompt);
         const response = result.response;
@@ -120,15 +169,30 @@ Keep it appropriate, engaging, and suitable for all audiences. Make the video pr
             throw new Error('Could not parse JSON from AI response');
         }
 
-        const scene = JSON.parse(jsonMatch[0]);
+        let scene = JSON.parse(jsonMatch[0]);
+
+        // ENFORCE location consistency
+        scene = validateSceneConsistency(scene, description, name);
+
+        // Add explicit video instruction for generation
+        scene.videoInstruction = `MUST SHOW: ${description} as the primary setting. Character ${name} must be visible at this location.`;
+        scene.setting = description;
+        scene.character = { name, gender, description };
 
         // Verify we have exactly 4 choices
         if (!scene.choices || scene.choices.length !== 4) {
             console.warn(`⚠️ AI generated ${scene.choices?.length || 0} choices, expected 4. Adjusting...`);
 
-            // If we have fewer than 4, add generic choices
+            // If we have fewer than 4, add contextual choices
+            const defaultChoices = [
+                { text: "🔍 Look around carefully", genre: "mystery" },
+                { text: "⚔️ Take decisive action", genre: "action" },
+                { text: "💬 Call out or speak", genre: "drama" },
+                { text: "🎲 Wait and observe", genre: "random" }
+            ];
+
             while (scene.choices.length < 4) {
-                scene.choices.push({ text: "Explore the area" });
+                scene.choices.push(defaultChoices[scene.choices.length % defaultChoices.length]);
             }
             // If we have more than 4, truncate
             scene.choices = scene.choices.slice(0, 4);
@@ -142,7 +206,10 @@ Keep it appropriate, engaging, and suitable for all audiences. Make the video pr
             });
         }
 
-        console.log('✅ Story opening generated with 4 choices');
+        console.log('✅ Story opening generated with location-enforced prompts');
+        console.log(`📍 Setting: ${scene.setting}`);
+        console.log(`🎥 Video prompt: ${scene.videoPrompt.substring(0, 100)}...`);
+
         res.json({ scene });
 
     } catch (error) {
@@ -262,7 +329,7 @@ Keep it appropriate, engaging, and suitable for all audiences. Make each choice 
 app.post('/api/generate-video', async (req, res) => {
     try {
         console.log('🎥 Generating video with Veo 3.1 (includes audio!)...');
-        const { prompt, narration, duration = 8 } = req.body;
+        const { prompt, narration, duration = 8, videoInstruction } = req.body;
 
         // Content filter on prompts
         const promptFilter = checkContentFilter(prompt);
@@ -270,10 +337,19 @@ app.post('/api/generate-video', async (req, res) => {
             return res.status(400).json({ error: 'Video prompt failed content filter' });
         }
 
-        // Combine visual prompt with narration for better audio generation
-        const fullPrompt = `${prompt}. ${narration ? 'Narration: ' + narration : ''}`;
+        // Build the video prompt with location enforcement
+        let enhancedPrompt = prompt;
 
-        console.log('📝 Video prompt:', fullPrompt);
+        // If videoInstruction exists (location enforcement), prepend it
+        if (videoInstruction) {
+            enhancedPrompt = `${videoInstruction}. ${prompt}`;
+            console.log('📍 Location enforced in video generation');
+        }
+
+        // Combine visual prompt with narration for better audio generation
+        const fullPrompt = `${enhancedPrompt}. ${narration ? 'Narration: ' + narration : ''}`;
+
+        console.log('📝 Video prompt:', fullPrompt.substring(0, 150) + '...');
 
         // Generate video with Veo 3.1 - includes synchronized audio!
         const result = await videoModel.generateContent({
