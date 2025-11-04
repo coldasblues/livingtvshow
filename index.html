@@ -461,9 +461,45 @@
 </head>
 <body>
     <div class="story-container">
-        <!-- 🎭 Character Creation Screen -->
-        <div class="character-creation" id="characterCreation">
+        <!-- 🌍 Story Setup Screen (Step 1) -->
+        <div class="character-creation" id="storySetupScreen">
+            <h1>Set Your Scene</h1>
+            <p style="color: #666; margin-bottom: 30px;">First, choose where your story takes place</p>
+
+            <form class="character-form" id="setupForm" onsubmit="proceedToCharacter(event)">
+                <div class="form-group">
+                    <label for="settingInput">Setting / Location *</label>
+                    <input
+                        type="text"
+                        id="settingInput"
+                        placeholder="e.g., Gas station, Coffee shop, Space station, Medieval castle"
+                        required
+                        maxlength="100"
+                    >
+                    <div class="form-hint">Where does your story take place?</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="themesInput">Story Themes (optional)</label>
+                    <input
+                        type="text"
+                        id="themesInput"
+                        placeholder="e.g., Mystery, Comedy, Horror, Christmas, Time travel"
+                        maxlength="100"
+                    >
+                    <div class="form-hint">What kind of story? Separate multiple themes with commas</div>
+                </div>
+
+                <button type="submit" class="generate-button">
+                    Next: Create Character →
+                </button>
+            </form>
+        </div>
+
+        <!-- 🎭 Character Creation Screen (Step 2) -->
+        <div class="character-creation hidden" id="characterCreation">
             <h1>Create Your Character</h1>
+            <p id="characterContext" style="color: #667eea; font-weight: 600; margin-bottom: 20px;"></p>
 
             <!-- Coin Flip for Gender -->
             <div class="coin-container">
@@ -493,7 +529,7 @@
                     <label for="characterDescription">Character Description</label>
                     <textarea
                         id="characterDescription"
-                        placeholder="e.g., a gas station worker, a detective, a student..."
+                        placeholder="e.g., night shift worker, barista, astronaut, knight..."
                         required
                         maxlength="200"
                     ></textarea>
@@ -502,6 +538,10 @@
 
                 <button type="submit" class="generate-button" id="generateButton">
                     Generate Your Story 🎬
+                </button>
+
+                <button type="button" class="control-button" onclick="backToSetup()" style="width: 100%; margin-top: 10px;">
+                    ← Back to Setting
                 </button>
 
                 <div class="error-message" id="errorMessage"></div>
@@ -570,6 +610,12 @@
         // 🎮 INTERACTIVE STORY PLATFORM - Gemini AI Frontend Controller
 
         // State management
+        let storySetup = {
+            setting: '',
+            themes: [],
+            character: null
+        };
+
         let currentCharacter = {
             name: '',
             gender: null,
@@ -579,6 +625,42 @@
         let audioEnabled = true;
         let storyHistory = [];
         let flipCount = 0;
+
+        // 🌍 Story Setup Functions
+        function proceedToCharacter(event) {
+            event.preventDefault();
+
+            const setting = document.getElementById('settingInput').value.trim();
+            const themesRaw = document.getElementById('themesInput').value.trim();
+
+            // Validate setting
+            if (!setting) {
+                alert('Please enter a setting for your story');
+                return;
+            }
+
+            // Store setup data
+            storySetup.setting = setting;
+            storySetup.themes = themesRaw ? themesRaw.split(',').map(t => t.trim()).filter(t => t) : [];
+
+            // Show character creation screen
+            document.getElementById('storySetupScreen').classList.add('hidden');
+            document.getElementById('characterCreation').classList.remove('hidden');
+
+            // Update context message
+            let contextMsg = `Your story takes place at: ${setting}`;
+            if (storySetup.themes.length > 0) {
+                contextMsg += ` (${storySetup.themes.join(', ')})`;
+            }
+            document.getElementById('characterContext').textContent = contextMsg;
+
+            console.log('📍 Story setup:', storySetup);
+        }
+
+        function backToSetup() {
+            document.getElementById('characterCreation').classList.add('hidden');
+            document.getElementById('storySetupScreen').classList.remove('hidden');
+        }
 
         // 🪙 Coin Flip Animation
         function flipCoin() {
@@ -641,11 +723,20 @@
             errorMsg.classList.remove('show');
 
             try {
+                // Prepare complete story request with setting and themes
+                const storyRequest = {
+                    ...currentCharacter,
+                    setting: storySetup.setting,
+                    themes: storySetup.themes
+                };
+
+                console.log('🎬 Generating story with:', storyRequest);
+
                 // Call API to generate story
                 const response = await fetch('/api/generate-story', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(currentCharacter)
+                    body: JSON.stringify(storyRequest)
                 });
 
                 const data = await response.json();

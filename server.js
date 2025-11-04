@@ -54,12 +54,53 @@ function checkContentFilter(text) {
     return { passed: true };
 }
 
+// 🎯 Generate Explicit Video Prompt - Maps settings to specific visual elements
+function generateExplicitVideoPrompt(setting, themes = []) {
+    // Map common settings to specific visual elements
+    const visualMap = {
+        'gas station': 'gas pumps, neon signs, convenience store, fluorescent lights, fuel dispensers',
+        'coffee shop': 'espresso machine, wooden tables, warm lighting, coffee cups, barista counter',
+        'space station': 'metallic corridors, view of stars through windows, control panels, zero gravity elements, futuristic tech',
+        'medieval castle': 'stone walls, torches, throne room, medieval banners, suits of armor',
+        'hospital': 'medical equipment, white walls, hospital beds, fluorescent lights, sanitized environment',
+        'school': 'classroom desks, chalkboard, lockers, hallway, school supplies',
+        'library': 'bookshelves, reading tables, dim warm lighting, old books, quiet atmosphere',
+        'bar': 'bar counter, bottles on shelves, dim moody lighting, bar stools, neon beer signs',
+        'restaurant': 'dining tables, kitchen visible, food service, ambient lighting, customers dining',
+        'office': 'desk, computer monitors, cubicles, office supplies, professional environment'
+    };
+
+    let videoBase = setting;
+    const settingLower = setting.toLowerCase();
+
+    // Check if we have a visual map for this setting
+    for (const [key, visuals] of Object.entries(visualMap)) {
+        if (settingLower.includes(key)) {
+            videoBase = `${setting} with ${visuals}`;
+            break;
+        }
+    }
+
+    // Add theme-based atmosphere
+    for (const theme of themes) {
+        const themeLower = theme.toLowerCase();
+        if (themeLower.includes('horror')) videoBase += ', dark shadows, ominous atmosphere, eerie lighting';
+        if (themeLower.includes('christmas')) videoBase += ', christmas decorations, snow visible, festive lights, holiday atmosphere';
+        if (themeLower.includes('mystery')) videoBase += ', fog effects, mysterious lighting, noir cinematography';
+        if (themeLower.includes('comedy')) videoBase += ', bright colorful lighting, cheerful atmosphere';
+        if (themeLower.includes('sci-fi') || themeLower.includes('futuristic')) videoBase += ', neon lights, holographic displays, advanced technology';
+        if (themeLower.includes('romantic')) videoBase += ', soft warm lighting, intimate atmosphere';
+    }
+
+    return videoBase;
+}
+
 // 🎯 Validate Scene Consistency - Ensures location is in video prompt
-function validateSceneConsistency(scene, description, name) {
-    const keywords = description.toLowerCase().split(' ').filter(w => w.length > 3);
+function validateSceneConsistency(scene, setting, name) {
+    const keywords = setting.toLowerCase().split(' ').filter(w => w.length > 3);
     let hasLocation = false;
 
-    // Check if video prompt contains any significant keywords from description
+    // Check if video prompt contains any significant keywords from setting
     for (const word of keywords) {
         if (scene.videoPrompt.toLowerCase().includes(word)) {
             hasLocation = true;
@@ -69,8 +110,8 @@ function validateSceneConsistency(scene, description, name) {
 
     // If location missing, force it into the prompt
     if (!hasLocation) {
-        console.warn('⚠️ Video prompt missing location:', description);
-        scene.videoPrompt = `${name} at ${description}, ${scene.videoPrompt}`;
+        console.warn('⚠️ Video prompt missing setting:', setting);
+        scene.videoPrompt = `${setting}: ${scene.videoPrompt}`;
     }
 
     // Ensure narration mentions the setting
@@ -84,7 +125,7 @@ function validateSceneConsistency(scene, description, name) {
     }
 
     if (!hasNarrationLocation) {
-        console.warn('⚠️ Narration missing location context:', description);
+        console.warn('⚠️ Narration missing location context:', setting);
     }
 
     return scene;
@@ -94,11 +135,15 @@ function validateSceneConsistency(scene, description, name) {
 app.post('/api/generate-story', async (req, res) => {
     try {
         console.log('🎬 Generating new story...');
-        const { name, gender, description } = req.body;
+        const { name, gender, description, setting, themes = [] } = req.body;
 
         // Validate inputs
         if (!name || !gender || !description) {
             return res.status(400).json({ error: 'Missing required character information' });
+        }
+
+        if (!setting) {
+            return res.status(400).json({ error: 'Missing story setting/location' });
         }
 
         // Content filter check
@@ -112,50 +157,66 @@ app.post('/api/generate-story', async (req, res) => {
             return res.status(400).json({ error: descFilter.reason });
         }
 
+        const settingFilter = checkContentFilter(setting);
+        if (!settingFilter.passed) {
+            return res.status(400).json({ error: settingFilter.reason });
+        }
+
         console.log(`📝 Creating story for ${gender} character: ${name}, ${description}`);
+        console.log(`📍 Setting: ${setting}`);
+        console.log(`🎭 Themes: ${themes.join(', ') || 'None'}`);
 
-        // Extract setting/location from description
-        const setting = description.toLowerCase();
+        // Generate explicit video prompt with visual details
+        const explicitVideoBase = generateExplicitVideoPrompt(setting, themes);
 
-        // Build prompt that ENFORCES location consistency
-        const prompt = `Create a story for ${name} (${gender}) who is described as: "${description}"
+        // Build prompt that ENFORCES setting and theme consistency
+        const themesText = themes.length > 0 ? themes.join(', ') : 'general adventure';
+        const prompt = `Create a story with these EXACT specifications:
+
+CHARACTER: ${name}, a ${gender} ${description}
+SETTING: ${setting} (MUST be the PRIMARY location - this is CRITICAL)
+THEMES: ${themesText}
+VISUAL ELEMENTS: ${explicitVideoBase}
 
 CRITICAL RULES - MUST FOLLOW:
-1. The videoPrompt MUST START with "${name} at ${description}" or "${name} in ${description}"
-2. The narration MUST take place at the location mentioned in "${description}"
-3. Include specific visual details about the "${description}" setting
-4. The story should begin at this exact location
+1. The videoPrompt MUST START with "${setting}" or "${name} at ${setting}"
+2. The videoPrompt MUST include these visual elements: ${explicitVideoBase}
+3. The narration MUST take place at "${setting}"
+4. The story MUST incorporate these themes: ${themesText}
+5. Opening scene happens at ${setting} - nowhere else
 
 LOCATION ENFORCEMENT:
-- Primary setting: ${description}
-- Character is currently AT/IN this location
-- Video must SHOW this specific setting
-- Opening scene happens HERE
+- Primary setting: ${setting}
+- Character ${name} is currently AT/IN ${setting}
+- Video must SHOW ${setting} as described: ${explicitVideoBase}
+- All action happens at ${setting}
 
-Generate EXACTLY 4 meaningful choices (not 3, not 5).
+Generate EXACTLY 4 meaningful choices that reflect the themes: ${themesText}
 
 Return ONLY valid JSON with this exact structure:
 {
     "id": "opening",
-    "videoPrompt": "${name} at ${description}, [add 15 more cinematic words describing this specific location, lighting, atmosphere, camera angle]",
-    "narrationText": "Story opening that takes place at the ${description} location (100-150 words). MUST mention the ${description} setting explicitly.",
-    "setting": "${description}",
+    "videoPrompt": "${setting}, ${explicitVideoBase}, ${name} the ${description} is present, [add cinematic details: lighting, camera angle, atmosphere matching ${themesText}]",
+    "narrationText": "Story opening at ${setting} (100-150 words). Incorporate ${themesText} themes. MUST mention ${setting} explicitly. ${name} is a ${description}.",
+    "explicitSetting": "${setting}",
+    "themes": ${JSON.stringify(themes)},
     "choices": [
-        {"text": "🔍 Investigate something mysterious here", "genre": "mystery"},
-        {"text": "⚔️ Take action in this situation", "genre": "action"},
-        {"text": "💬 Interact with someone at this location", "genre": "drama"},
-        {"text": "🎲 Something unexpected happens", "genre": "random"}
+        {"text": "Choice 1 influenced by ${themesText}", "genre": "${themes[0] || 'mystery'}"},
+        {"text": "Choice 2 influenced by ${themesText}", "genre": "${themes[1] || 'action'}"},
+        {"text": "Choice 3 influenced by ${themesText}", "genre": "${themes[2] || 'drama'}"},
+        {"text": "Choice 4 influenced by ${themesText}", "genre": "random"}
     ]
 }
 
-EXAMPLE for "Morgan, gas station worker":
+EXAMPLE for Setting:"Gas station", Character:"Morgan, night worker", Themes:"Mystery":
 {
-    "videoPrompt": "Morgan at gas station, fluorescent lights humming, fuel pumps visible in frame, late night shift, empty parking lot, convenience store glowing behind them",
-    "narrationText": "Another slow night at the gas station where Morgan works the graveyard shift. The fluorescent lights buzz overhead as Morgan...",
+    "videoPrompt": "Gas station with gas pumps, neon signs, convenience store, fluorescent lights, fuel dispensers, fog effects, mysterious lighting, Morgan the night worker present, late shift atmosphere, noir cinematography",
+    "narrationText": "The gas station's fluorescent lights cast long shadows across the empty lot. Morgan's shift had been quiet - too quiet. Then the stranger arrived...",
+    "explicitSetting": "Gas station",
     ...
 }
 
-Make it cinematic, engaging, and appropriate for all audiences.`;
+Make it cinematic, engaging, and appropriate for all audiences. The setting ${setting} is NON-NEGOTIABLE.`;
 
         const result = await textModel.generateContent(prompt);
         const response = result.response;
@@ -172,11 +233,11 @@ Make it cinematic, engaging, and appropriate for all audiences.`;
         let scene = JSON.parse(jsonMatch[0]);
 
         // ENFORCE location consistency
-        scene = validateSceneConsistency(scene, description, name);
+        scene = validateSceneConsistency(scene, setting, name);
 
         // Add explicit video instruction for generation
-        scene.videoInstruction = `MUST SHOW: ${description} as the primary setting. Character ${name} must be visible at this location.`;
-        scene.setting = description;
+        scene.videoInstruction = `MUST SHOW: ${setting} as the primary setting. Character ${name} must be visible at this location.`;
+        scene.setting = setting;
         scene.character = { name, gender, description };
 
         // Verify we have exactly 4 choices
