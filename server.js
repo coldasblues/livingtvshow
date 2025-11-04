@@ -6,6 +6,7 @@ const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const StoryGenerator = require('./story-generator.js');
 const VideoGenerator = require('./video-generator.js');
+const EpisodeManager = require('./episode-manager.js');
 require('dotenv').config();
 
 const app = express();
@@ -18,9 +19,10 @@ app.use(express.static('.'));
 // 🤖 Initialize Gemini AI
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// Models
+// Models - Hybrid Architecture
 const textModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // For text generation
 const videoModel = genAI.getGenerativeModel({ model: 'veo-003' }); // For video generation with native audio!
+const orchestratorModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' }); // For intelligent orchestration
 
 // 📚 Initialize Story Generator (modular component)
 const storyGenerator = new StoryGenerator({
@@ -34,6 +36,17 @@ const videoGenerator = new VideoGenerator({
     defaultDuration: 8,
     maxRetries: 3,
     retryDelay: 1000
+});
+
+// 🎬 Initialize Episode Manager (Gemini Pro orchestrator)
+const episodeManager = new EpisodeManager({
+    orchestratorModel: orchestratorModel,
+    storyGenerator: storyGenerator,
+    videoGenerator: videoGenerator,
+    maxSegments: 7,
+    minSegments: 3,
+    enhancePrompts: true,
+    trackCoherence: true
 });
 
 // 🚫 Content Filter - Checks for inappropriate content
@@ -393,6 +406,82 @@ app.post('/test-video', async (req, res) => {
     }
 });
 
+// 🎬 Generate Complete Episode with Gemini Pro Orchestration
+app.post('/api/generate-episode', async (req, res) => {
+    try {
+        const { name, gender, description, setting, themes = [] } = req.body;
+
+        // Validate inputs
+        if (!name || !gender || !description || !setting) {
+            return res.status(400).json({
+                error: 'Missing required fields: name, gender, description, setting'
+            });
+        }
+
+        // Content filter on inputs
+        const inputText = `${name} ${description} ${setting} ${themes.join(' ')}`;
+        const filter = checkContentFilter(inputText);
+        if (!filter.passed) {
+            return res.status(400).json({
+                error: 'Input failed content filter',
+                reason: filter.reason
+            });
+        }
+
+        console.log(`🎬 Generating complete episode for ${name}...`);
+
+        // Generate episode with Gemini Pro orchestration
+        const episode = await episodeManager.generateEpisode({
+            name,
+            gender,
+            description,
+            setting,
+            themes
+        });
+
+        console.log(`✅ Episode complete! ${episode.segments.length} segments`);
+
+        res.json({
+            success: true,
+            episode: {
+                id: episode.id,
+                character: episode.character,
+                setting: episode.setting,
+                themes: episode.themes,
+                summary: episode.summary,
+                segmentCount: episode.segments.length,
+                duration: episode.segments.length * 8, // Approximate seconds
+                segments: episode.segments,
+                narrativeArc: episode.narrativeArc,
+                startedAt: episode.startedAt,
+                completedAt: episode.completedAt
+            }
+        });
+
+    } catch (error) {
+        console.error('❌ Episode generation error:', error);
+        res.status(500).json({
+            error: 'Failed to generate episode',
+            details: error.message
+        });
+    }
+});
+
+// 📊 Get Current Episode Status
+app.get('/api/episode-status', (req, res) => {
+    const stats = episodeManager.getEpisodeStats();
+    res.json(stats);
+});
+
+// 🔄 Reset Episode Manager
+app.post('/api/reset-episode', (req, res) => {
+    episodeManager.reset();
+    res.json({
+        success: true,
+        message: 'Episode manager reset'
+    });
+});
+
 // 📊 Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({
@@ -400,13 +489,16 @@ app.get('/api/health', (req, res) => {
         geminiConfigured: !!process.env.GEMINI_API_KEY,
         models: {
             text: 'gemini-2.0-flash-exp',
-            video: 'veo-003 (with native audio)'
+            video: 'veo-003 (with native audio)',
+            orchestrator: 'gemini-1.5-pro'
         },
         features: {
             dynamicStoryGeneration: true,
             characterCreation: true,
             contentFiltering: true,
-            choicesPerScene: 4
+            choicesPerScene: 4,
+            episodeOrchestration: true,
+            narrativeCoherence: true
         }
     });
 });
@@ -415,33 +507,49 @@ app.get('/api/health', (req, res) => {
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`
-    🎮 Interactive Story Platform - Gemini AI Edition!
+    🎮 Interactive Story Platform - Gemini AI Hybrid Architecture!
     📍 Running at: http://localhost:${PORT}
 
-    🤖 AI Features:
-    ✅ Text Generation: gemini-2.0-flash-exp
+    🤖 AI Models - Three-Tier Architecture:
+    🧠 Orchestrator: Gemini 1.5 Pro (intelligent coordination)
+    ✅ Text Generation: Gemini 2.0 Flash (story content)
     🎥 Video Generation: Veo 3.1 (with native audio!)
-    ✨ Dynamic Story Generation (NEW!)
-    🎭 Character Creation (NEW!)
-    🛡️ Content Filtering (NEW!)
+
+    ✨ New Episode Orchestration Features:
+    🎬 Complete episode generation (3-7 segments)
+    📋 Narrative arc planning by Gemini Pro
+    🔍 Automatic coherence checking between segments
+    ✨ AI-enhanced video prompts for better visuals
+    🎯 Intelligent pacing decisions
+    📝 Episode summaries
 
     💡 Key Features:
     - Create custom characters (name, gender, description)
-    - 8-second video clips for each scene
-    - Native audio/dialogue in videos ($0.35/sec)
-    - 4 meaningful choices per scene
-    - Can extend videos up to 148 seconds
-    - 720p or 1080p resolution
-    - AI-generated branching narratives
+    - Full episodes with narrative coherence
+    - 8-second video clips for each segment
+    - Native audio/dialogue in videos
+    - AI-coordinated story flow
+    - Smart branching and pacing
+    - 720p or 1080p video resolution
+
+    🔌 API Endpoints:
+    - POST /api/generate-episode (full orchestrated episode)
+    - POST /api/generate-story (single scene)
+    - POST /api/generate-next-scene (scene continuation)
+    - POST /api/generate-video (video only)
+    - GET  /api/episode-status (current episode state)
+    - POST /api/reset-episode (reset orchestrator)
+    - GET  /api/health (system status)
 
     Quick Start:
     1. Add your Gemini API key to .env file
        Get it here: https://aistudio.google.com/app/apikey
     2. Open browser to http://localhost:${PORT}
     3. Create your character and start your adventure!
+    4. Try the new episode orchestration for full stories!
 
     ${process.env.GEMINI_API_KEY === 'your_gemini_api_key_here' ?
         '⚠️  WARNING: Please add your Gemini API key to .env file!' :
-        '✅ Gemini API key configured - Ready to generate stories!'}
+        '✅ Gemini API key configured - Ready to orchestrate stories!'}
     `);
 });
