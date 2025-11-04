@@ -4,6 +4,7 @@
 const express = require('express');
 const cors = require('cors');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const StoryGenerator = require('./story-generator.js');
 require('dotenv').config();
 
 const app = express();
@@ -19,6 +20,12 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 // Models
 const textModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' }); // For text generation
 const videoModel = genAI.getGenerativeModel({ model: 'veo-003' }); // For video generation with native audio!
+
+// 📚 Initialize Story Generator (modular component)
+const storyGenerator = new StoryGenerator({
+    textModel: textModel,
+    contentFilter: checkContentFilter  // Will be defined below
+});
 
 // 🚫 Content Filter - Checks for inappropriate content
 function checkContentFilter(text) {
@@ -132,163 +139,23 @@ function validateSceneConsistency(scene, setting, name) {
 }
 
 // 🎬 Generate Initial Story - Creates opening scene based on character
+// 🎬 Generate Story Opening - Uses modular StoryGenerator
 app.post('/api/generate-story', async (req, res) => {
     try {
-        console.log('🎬 Generating new story...');
         const { name, gender, description, setting, themes = [] } = req.body;
 
-        // Validate inputs
-        if (!name || !gender || !description) {
-            return res.status(400).json({ error: 'Missing required character information' });
-        }
+        // Build context object for StoryGenerator
+        const context = {
+            setting,
+            character: { name, gender, description },
+            themes,
+            variationSeed: Math.floor(Math.random() * 1000000)
+        };
 
-        if (!setting) {
-            return res.status(400).json({ error: 'Missing story setting/location' });
-        }
+        // Use StoryGenerator to create the opening segment
+        const scene = await storyGenerator.generateSegment(context);
 
-        // Content filter check
-        const nameFilter = checkContentFilter(name);
-        if (!nameFilter.passed) {
-            return res.status(400).json({ error: nameFilter.reason });
-        }
-
-        const descFilter = checkContentFilter(description);
-        if (!descFilter.passed) {
-            return res.status(400).json({ error: descFilter.reason });
-        }
-
-        const settingFilter = checkContentFilter(setting);
-        if (!settingFilter.passed) {
-            return res.status(400).json({ error: settingFilter.reason });
-        }
-
-        console.log(`📝 Creating story for ${gender} character: ${name}, ${description}`);
-        console.log(`📍 Setting: ${setting}`);
-        console.log(`🎭 Themes: ${themes.join(', ') || 'None'}`);
-
-        // Generate explicit video prompt with visual details
-        const explicitVideoBase = generateExplicitVideoPrompt(setting, themes);
-
-        // 🎲 Add variation elements to make each generation unique
-        const timeOfDayOptions = ['early morning', 'mid-morning', 'noon', 'afternoon', 'dusk', 'evening', 'late night', 'midnight', 'pre-dawn'];
-        const weatherOptions = ['clear skies', 'overcast', 'light rain', 'heavy rain', 'fog', 'mist', 'snow flurries', 'windy conditions', 'humid atmosphere', 'crisp air'];
-        const cameraAngles = ['wide establishing shot', 'close-up', 'medium shot', 'low angle', 'high angle', 'dutch angle', 'over-the-shoulder', 'tracking shot'];
-        const moodModifiers = ['tense', 'peaceful', 'ominous', 'hopeful', 'melancholic', 'energetic', 'mysterious', 'contemplative', 'anxious', 'serene'];
-
-        const randomTimeOfDay = timeOfDayOptions[Math.floor(Math.random() * timeOfDayOptions.length)];
-        const randomWeather = weatherOptions[Math.floor(Math.random() * weatherOptions.length)];
-        const randomCamera = cameraAngles[Math.floor(Math.random() * cameraAngles.length)];
-        const randomMood = moodModifiers[Math.floor(Math.random() * moodModifiers.length)];
-        const randomSeed = Math.floor(Math.random() * 1000000);
-
-        console.log(`🎲 Variation: ${randomTimeOfDay}, ${randomWeather}, ${randomCamera}, ${randomMood} (seed: ${randomSeed})`);
-
-        // Build prompt that ENFORCES setting and theme consistency
-        const themesText = themes.length > 0 ? themes.join(', ') : 'general adventure';
-        const prompt = `Create a story with these EXACT specifications:
-
-VARIATION SEED: ${randomSeed} (Use this to create a unique opening - never repeat the same scenario)
-
-TIME & ATMOSPHERE:
-- Time of day: ${randomTimeOfDay}
-- Weather/Atmosphere: ${randomWeather}
-- Camera style: ${randomCamera}
-- Overall mood: ${randomMood}
-
-Create a story with these EXACT specifications:
-
-CHARACTER: ${name}, a ${gender} ${description}
-SETTING: ${setting} (MUST be the PRIMARY location - this is CRITICAL)
-THEMES: ${themesText}
-VISUAL ELEMENTS: ${explicitVideoBase}
-
-CRITICAL RULES - MUST FOLLOW:
-1. The videoPrompt MUST START with "${setting}" or "${name} at ${setting}"
-2. The videoPrompt MUST include these visual elements: ${explicitVideoBase}
-3. INCORPORATE the time (${randomTimeOfDay}) and weather (${randomWeather}) into the scene
-4. Use ${randomCamera} perspective and capture a ${randomMood} mood
-5. The narration MUST take place at "${setting}"
-6. The story MUST incorporate these themes: ${themesText}
-7. Opening scene happens at ${setting} - nowhere else
-8. Create a UNIQUE scenario - avoid generic openings
-
-LOCATION ENFORCEMENT:
-- Primary setting: ${setting}
-- Character ${name} is currently AT/IN ${setting}
-- Video must SHOW ${setting} as described: ${explicitVideoBase}
-- All action happens at ${setting}
-
-Generate EXACTLY 4 meaningful choices that reflect the themes: ${themesText}
-
-Return ONLY valid JSON with this exact structure:
-{
-    "id": "opening",
-    "videoPrompt": "${setting}, ${explicitVideoBase}, ${randomTimeOfDay}, ${randomWeather}, ${randomCamera}, ${name} the ${description} is present, ${randomMood} atmosphere, [add unique cinematic details matching ${themesText}]",
-    "narrationText": "Story opening at ${setting} during ${randomTimeOfDay} with ${randomWeather} (100-150 words). Incorporate ${themesText} themes and ${randomMood} mood. MUST mention ${setting} explicitly. ${name} is a ${description}. Make this scenario UNIQUE.",
-    "explicitSetting": "${setting}",
-    "themes": ${JSON.stringify(themes)},
-    "choices": [
-        {"text": "Choice 1 influenced by ${themesText}", "genre": "${themes[0] || 'mystery'}"},
-        {"text": "Choice 2 influenced by ${themesText}", "genre": "${themes[1] || 'action'}"},
-        {"text": "Choice 3 influenced by ${themesText}", "genre": "${themes[2] || 'drama'}"},
-        {"text": "Choice 4 influenced by ${themesText}", "genre": "random"}
-    ]
-}
-
-EXAMPLE for Setting:"Gas station", Character:"Morgan, night worker", Themes:"Mystery" with variations:
-{
-    "videoPrompt": "Gas station with gas pumps, neon signs, convenience store, fluorescent lights, fuel dispensers, late night, fog, low angle shot, Morgan the night worker present, ominous atmosphere, noir cinematography, mysterious figure approaching from distance",
-    "narrationText": "Late night fog rolls across the gas station lot. Morgan's shift had been quiet until a car with no headlights pulled up to pump 3. The driver sat motionless, staring at the convenience store windows...",
-    "explicitSetting": "Gas station",
-    ...
-}
-
-IMPORTANT: Each generation should feel FRESH and DIFFERENT - vary the specific situation, conflict, or hook while maintaining the setting and themes.
-
-Make it cinematic, engaging, and appropriate for all audiences. The setting ${setting} is NON-NEGOTIABLE.`;
-
-        const result = await textModel.generateContent(prompt);
-        const response = result.response;
-        const text = response.text();
-
-        console.log('📄 Raw AI response:', text);
-
-        // Parse JSON from response
-        const jsonMatch = text.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            throw new Error('Could not parse JSON from AI response');
-        }
-
-        let scene = JSON.parse(jsonMatch[0]);
-
-        // ENFORCE location consistency
-        scene = validateSceneConsistency(scene, setting, name);
-
-        // Add explicit video instruction for generation
-        scene.videoInstruction = `MUST SHOW: ${setting} as the primary setting. Character ${name} must be visible at this location.`;
-        scene.setting = setting;
-        scene.character = { name, gender, description };
-
-        // Verify we have exactly 4 choices
-        if (!scene.choices || scene.choices.length !== 4) {
-            console.warn(`⚠️ AI generated ${scene.choices?.length || 0} choices, expected 4. Adjusting...`);
-
-            // If we have fewer than 4, add contextual choices
-            const defaultChoices = [
-                { text: "🔍 Look around carefully", genre: "mystery" },
-                { text: "⚔️ Take decisive action", genre: "action" },
-                { text: "💬 Call out or speak", genre: "drama" },
-                { text: "🎲 Wait and observe", genre: "random" }
-            ];
-
-            while (scene.choices.length < 4) {
-                scene.choices.push(defaultChoices[scene.choices.length % defaultChoices.length]);
-            }
-            // If we have more than 4, truncate
-            scene.choices = scene.choices.slice(0, 4);
-        }
-
-        // Content filter check on generated content
+        // Content filter check on generated narration
         const sceneFilter = checkContentFilter(scene.narrationText);
         if (!sceneFilter.passed) {
             return res.status(400).json({
@@ -296,7 +163,7 @@ Make it cinematic, engaging, and appropriate for all audiences. The setting ${se
             });
         }
 
-        console.log('✅ Story opening generated with location-enforced prompts');
+        console.log('✅ Story opening generated');
         console.log(`📍 Setting: ${scene.setting}`);
         console.log(`🎥 Video prompt: ${scene.videoPrompt.substring(0, 100)}...`);
 
@@ -305,7 +172,7 @@ Make it cinematic, engaging, and appropriate for all audiences. The setting ${se
     } catch (error) {
         console.error('❌ Story generation error:', error);
         res.status(500).json({
-            error: 'Failed to generate story. Please try again.',
+            error: error.message || 'Failed to generate story. Please try again.',
             details: error.message
         });
     }
